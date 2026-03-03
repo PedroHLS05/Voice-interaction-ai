@@ -70,12 +70,13 @@ class AudioCapture(threading.Thread):
 
 
 class RecognizerThread(threading.Thread):
-    def __init__(self, text_queue: queue.Queue, stop_event: threading.Event, language="pt-BR"):
+    def __init__(self, text_queue: queue.Queue, stop_event: threading.Event, language="pt-BR", buffer_queue: queue.Queue = None):
         super().__init__(daemon=True)
         self.text_queue = text_queue
         self.stop_event = stop_event
         self.language = language
         self.recognizer = sr.Recognizer()
+        self.buffer_queue = buffer_queue
 
     def run(self):
         mic = sr.Microphone()
@@ -93,6 +94,21 @@ class RecognizerThread(threading.Thread):
                     continue
                 except Exception:
                     continue
+
+                # Push a short snippet of the captured audio to the visual buffer (if provided)
+                try:
+                    if self.buffer_queue is not None:
+                        raw = audio.get_raw_data()
+                        # attempt to interpret as int16 samples
+                        try:
+                            samples = np.frombuffer(raw, dtype=np.int16)
+                        except Exception:
+                            samples = None
+                        if samples is not None and samples.size:
+                            self.buffer_queue.put(samples)
+                except Exception:
+                    pass
+
                 try:
                     text = self.recognizer.recognize_google(audio, language=self.language)
                     self.text_queue.put(text)
@@ -154,9 +170,9 @@ class VoiceUI:
             return
         self.running = True
         self.stop_event.clear()
-        self.audio_thread = AudioCapture(self.buffer_queue, self.stop_event)
-        self.rec_thread = RecognizerThread(self.text_queue, self.stop_event)
-        self.audio_thread.start()
+        # Start only the recognizer thread and let it feed the visual buffer
+        self.audio_thread = None
+        self.rec_thread = RecognizerThread(self.text_queue, self.stop_event, buffer_queue=self.buffer_queue)
         self.rec_thread.start()
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
