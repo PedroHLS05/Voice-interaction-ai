@@ -111,7 +111,7 @@ class VoiceUI:
         # Plot setup
         self.fig = Figure(figsize=(8, 3))
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Ondas Sonoras em Tempo Real")
+        self.ax.set_title("Converse com a Arena")
         self.ax.set_xlabel("Amostras")
         self.ax.set_ylabel("Amplitude")
         self.line, = self.ax.plot([], [])
